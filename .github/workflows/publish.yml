@@ -1,0 +1,115 @@
+name: Publish due social posts
+
+on:
+  schedule:
+    # co 15 minut, dokladnie jak lokalne zadanie Harmonogramu Zadan Windows ktore to zastepuje
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-due-posts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 05_SKRYPTY_SYSTEMU/social_video_publisher
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Rebuild .env from secrets
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          HOSTING_BRANCH: ${{ secrets.HOSTING_BRANCH }}
+          HOSTING_REPO: ${{ secrets.HOSTING_REPO }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_API_VERSION: ${{ secrets.INSTAGRAM_API_VERSION }}
+          INSTAGRAM_APP_ID: ${{ secrets.INSTAGRAM_APP_ID }}
+          INSTAGRAM_APP_SECRET: ${{ secrets.INSTAGRAM_APP_SECRET }}
+          INSTAGRAM_IG_USER_ID: ${{ secrets.INSTAGRAM_IG_USER_ID }}
+          INSTAGRAM_REDIRECT_URI: ${{ secrets.INSTAGRAM_REDIRECT_URI }}
+          PINTEREST_ACCESS_TOKEN: ${{ secrets.PINTEREST_ACCESS_TOKEN }}
+          PINTEREST_APP_ID: ${{ secrets.PINTEREST_APP_ID }}
+          PINTEREST_APP_SECRET: ${{ secrets.PINTEREST_APP_SECRET }}
+          PINTEREST_BOARD_ID: ${{ secrets.PINTEREST_BOARD_ID }}
+          PINTEREST_REFRESH_TOKEN: ${{ secrets.PINTEREST_REFRESH_TOKEN }}
+          TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
+          TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
+          TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
+          TIKTOK_PRIVACY_LEVEL: ${{ secrets.TIKTOK_PRIVACY_LEVEL }}
+          TIKTOK_REDIRECT_URI: ${{ secrets.TIKTOK_REDIRECT_URI }}
+          TIKTOK_REFRESH_TOKEN: ${{ secrets.TIKTOK_REFRESH_TOKEN }}
+          YOUTUBE_CATEGORY_ID: ${{ secrets.YOUTUBE_CATEGORY_ID }}
+          YOUTUBE_CLIENT_SECRETS_JSON_B64: ${{ secrets.YOUTUBE_CLIENT_SECRETS_JSON_B64 }}
+          YOUTUBE_TOKEN_JSON_B64: ${{ secrets.YOUTUBE_TOKEN_JSON_B64 }}
+        run: |
+          cat > .env <<EOF
+          SCHEDULE_CSV=schedule.csv
+          TIMEZONE=Europe/Warsaw
+          YOUTUBE_CLIENT_SECRETS_FILE=client_secret_youtube.json
+          YOUTUBE_TOKEN_FILE=youtube_token.json
+          YOUTUBE_CATEGORY_ID=${YOUTUBE_CATEGORY_ID}
+          INSTAGRAM_APP_ID=${INSTAGRAM_APP_ID}
+          INSTAGRAM_APP_SECRET=${INSTAGRAM_APP_SECRET}
+          INSTAGRAM_API_VERSION=${INSTAGRAM_API_VERSION}
+          INSTAGRAM_ACCESS_TOKEN=${INSTAGRAM_ACCESS_TOKEN}
+          INSTAGRAM_IG_USER_ID=${INSTAGRAM_IG_USER_ID}
+          INSTAGRAM_REDIRECT_URI=${INSTAGRAM_REDIRECT_URI}
+          TIKTOK_CLIENT_KEY=${TIKTOK_CLIENT_KEY}
+          TIKTOK_CLIENT_SECRET=${TIKTOK_CLIENT_SECRET}
+          TIKTOK_REDIRECT_URI=${TIKTOK_REDIRECT_URI}
+          TIKTOK_PRIVACY_LEVEL=${TIKTOK_PRIVACY_LEVEL}
+          TIKTOK_ACCESS_TOKEN=${TIKTOK_ACCESS_TOKEN}
+          TIKTOK_REFRESH_TOKEN=${TIKTOK_REFRESH_TOKEN}
+          PINTEREST_APP_ID=${PINTEREST_APP_ID}
+          PINTEREST_APP_SECRET=${PINTEREST_APP_SECRET}
+          PINTEREST_ACCESS_TOKEN=${PINTEREST_ACCESS_TOKEN}
+          PINTEREST_REFRESH_TOKEN=${PINTEREST_REFRESH_TOKEN}
+          PINTEREST_BOARD_ID=${PINTEREST_BOARD_ID}
+          GH_PAT=${GH_PAT}
+          GITHUB_HOSTING_REPO=${HOSTING_REPO}
+          GITHUB_HOSTING_BRANCH=${HOSTING_BRANCH}
+          EOF
+          echo "${YOUTUBE_CLIENT_SECRETS_JSON_B64}" | base64 -d > client_secret_youtube.json
+          echo "${YOUTUBE_TOKEN_JSON_B64}" | base64 -d > youtube_token.json
+
+      - name: Run due publishes
+        run: python main.py --run-due
+
+      - name: Persist rotated tokens (TikTok/Pinterest refresh on every use)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
+        run: |
+          get() { grep "^$1=" .env | head -1 | cut -d'=' -f2-; }
+          for key in TIKTOK_ACCESS_TOKEN TIKTOK_REFRESH_TOKEN PINTEREST_ACCESS_TOKEN PINTEREST_REFRESH_TOKEN PINTEREST_BOARD_ID; do
+            val=$(get "$key")
+            if [ -n "$val" ]; then
+              printf '%s' "$val" | gh secret set "$key" --repo "${{ github.repository }}"
+            fi
+          done
+
+      - name: Commit updated schedule.csv
+        if: always()
+        run: |
+          rm -f client_secret_youtube.json youtube_token.json .env
+          git config user.name "adhd-social-publisher-bot"
+          git config user.email "actions@users.noreply.github.com"
+          if ! git diff --quiet -- schedule.csv; then
+            git add schedule.csv
+            git commit -m "chore: update schedule.csv publish status [skip ci]"
+            git push
+          else
+            echo "No schedule.csv changes."
+          fi
