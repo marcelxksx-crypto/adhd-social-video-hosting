@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import logging
+import platform
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +56,12 @@ def _notify_windows(title: str, message: str) -> None:
     """Pokazuje dymek powiadomienia Windows - jedyny sposob, w jaki ten skrypt
     (uruchamiany bez okna, z Harmonogramu Zadan) moze cokolwiek "krzyknac" na
     ekran, gdy publikacja sie nie powiedzie. Bez dodatkowych zaleznosci Python -
-    korzysta z wbudowanego System.Windows.Forms przez PowerShell."""
+    korzysta z wbudowanego System.Windows.Forms przez PowerShell.
+
+    No-op poza Windows (np. na runnerze GitHub Actions) - tam i tak nikt nie
+    patrzy na ekran, a bledy trafiaja do logu joba."""
+    if platform.system() != "Windows":
+        return
     ps_script = f"""
 Add-Type -AssemblyName System.Windows.Forms
 $notify = New-Object System.Windows.Forms.NotifyIcon

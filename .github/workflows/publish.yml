@@ -106,10 +106,27 @@ jobs:
           rm -f client_secret_youtube.json youtube_token.json .env
           git config user.name "adhd-social-publisher-bot"
           git config user.email "actions@users.noreply.github.com"
-          if ! git diff --quiet -- schedule.csv; then
-            git add schedule.csv
-            git commit -m "chore: update schedule.csv publish status [skip ci]"
-            git push
-          else
+          if git diff --quiet -- schedule.csv; then
             echo "No schedule.csv changes."
+            exit 0
           fi
+          git add schedule.csv
+          git commit -m "chore: update schedule.csv publish status [skip ci]"
+          # Overlapping runs (manual dispatch + cron, or a slow run bumping
+          # into the next scheduled one) can both try to push at once - a
+          # plain push failed exactly this way on the very first live run.
+          # Retry with rebase a few times before giving up; each retry
+          # re-stashes nothing since the commit is already made, just the
+          # base moves under it.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push failed (attempt $attempt) - fetching and rebasing before retry."
+            git fetch origin main
+            git rebase origin/main
+            sleep $((attempt * 3))
+          done
+          echo "::error::Could not push schedule.csv after 5 attempts - status updates are LOST for this run, next run may re-publish already-sent rows."
+          exit 1

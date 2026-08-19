@@ -80,8 +80,20 @@ class TikTokClient:
         if not video_file.exists():
             raise TikTokApiError(f"Nie znaleziono pliku wideo: {video_path}")
         video_size = video_file.stat().st_size
-        chunk_size = min(CHUNK_SIZE, video_size)
-        total_chunks = max(1, (video_size + chunk_size - 1) // chunk_size)
+        # TikTok allows a single-chunk upload for anything up to 64MB - every
+        # reel in this pipeline is well under that, and splitting into fixed
+        # 10MB pieces anyway triggered "The total chunk count is invalid"
+        # (TikTok's PUT-chunk validation is stricter than the ceil-division
+        # math here suggests). Single-chunk (chunk_size == video_size,
+        # total_chunk_count == 1) is the simplest form TikTok documents and
+        # sidesteps that validation entirely.
+        SINGLE_CHUNK_MAX = 64 * 1024 * 1024
+        if video_size <= SINGLE_CHUNK_MAX:
+            chunk_size = video_size
+            total_chunks = 1
+        else:
+            chunk_size = CHUNK_SIZE
+            total_chunks = max(1, (video_size + chunk_size - 1) // chunk_size)
 
         init_resp = self._session.post(
             INIT_URL,
