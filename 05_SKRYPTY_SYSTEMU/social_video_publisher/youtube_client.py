@@ -63,6 +63,16 @@ class YouTubeClient:
         service.thumbnails().set(videoId=video_id, media_body=media).execute()
         logger.info("YouTube: ustawiono custom miniaturke dla video_id=%s", video_id)
 
+    def set_privacy(self, video_id: str, privacy_status: str) -> None:
+        """Zmienia widocznosc juz opublikowanego filmu (np. 'unlisted', 'public',
+        'private') - uzyte do chowania starego, przed-redesignowego contentu z
+        publicznego kanalu bez usuwania go (statystyki/komentarze zostaja)."""
+        service = self._get_service()
+        service.videos().update(
+            part="status", body={"id": video_id, "status": {"privacyStatus": privacy_status}}
+        ).execute()
+        logger.info("YouTube: video_id=%s -> privacyStatus=%s", video_id, privacy_status)
+
     def upload_short(
         self,
         video_path: str,
@@ -76,10 +86,15 @@ class YouTubeClient:
 
         YouTube samo wykrywa "Short" po proporcjach (pion) i dlugosci (<=60s) -
         nie ma osobnego "typu" do ustawienia, wystarczy wrzucic wlasciwy plik.
-        Wideo zawsze trafia jako prywatne (privacyStatus=private) - widoczne
-        tylko dla wlasciciela konta. publish_at_iso_utc pozwala dodatkowo
-        zaplanowac AUTOMATYCZNE przejscie na public o danej godzinie (YouTube
-        samo je opublikuje) - zostaw None, zeby wideo zostalo prywatne na stale.
+        Wideo trafia od razu jako publiczne (privacyStatus=public) - to jest
+        cel calego pipeline'u ("100% autonomicznie, bez mojej ingerencji").
+        Wczesniej bylo na sztywno private, co w praktyce oznaczalo, ze ZADEN
+        film nigdy nie byl naprawde publiczny automatycznie - widoczny byl
+        tylko wlascicielowi po zalogowaniu, co sprawialo mylne wrazenie ze
+        "kanal juz zyje", a realni widzowie nie widzieli nic. publish_at_iso_utc
+        nadal pozwala zamiast tego zaplanowac PRZYSZLA automatyczna publikacje
+        (YouTube samo przelaczy na public o danej godzinie), jesli kiedys
+        potrzebne bedzie opoznienie zamiast natychmiastowej publikacji.
         """
         video_file = Path(video_path)
         if not video_file.exists():
@@ -89,7 +104,7 @@ class YouTubeClient:
 
         status: dict[str, Any] = {
             "selfDeclaredMadeForKids": False,
-            "privacyStatus": "private",
+            "privacyStatus": "public",
         }
         if publish_at_iso_utc:
             status["publishAt"] = publish_at_iso_utc
