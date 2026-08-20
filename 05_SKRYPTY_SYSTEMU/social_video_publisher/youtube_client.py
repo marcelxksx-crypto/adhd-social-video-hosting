@@ -81,20 +81,22 @@ class YouTubeClient:
         tags: list[str],
         publish_at_iso_utc: str | None = None,
         thumbnail_path: str | None = None,
+        privacy_status: str = "private",
     ) -> dict[str, Any]:
         """Wgrywa pionowe wideo <=60s jako YouTube Short.
 
         YouTube samo wykrywa "Short" po proporcjach (pion) i dlugosci (<=60s) -
         nie ma osobnego "typu" do ustawienia, wystarczy wrzucic wlasciwy plik.
-        Wideo trafia od razu jako publiczne (privacyStatus=public) - to jest
-        cel calego pipeline'u ("100% autonomicznie, bez mojej ingerencji").
-        Wczesniej bylo na sztywno private, co w praktyce oznaczalo, ze ZADEN
-        film nigdy nie byl naprawde publiczny automatycznie - widoczny byl
-        tylko wlascicielowi po zalogowaniu, co sprawialo mylne wrazenie ze
-        "kanal juz zyje", a realni widzowie nie widzieli nic. publish_at_iso_utc
-        nadal pozwala zamiast tego zaplanowac PRZYSZLA automatyczna publikacje
-        (YouTube samo przelaczy na public o danej godzinie), jesli kiedys
-        potrzebne bedzie opoznienie zamiast natychmiastowej publikacji.
+
+        Tryb "Szkice" (2026-08-20, user request): wideo wgrywa sie jako
+        privacyStatus=private - w YouTube Studio to realny odpowiednik szkicu:
+        widoczne tylko wlascicielowi, edytowalne, gotowe do recznego
+        przejrzenia i kliknietego "Publish" kiedy user zdecyduje. To NIE jest
+        to samo co przypadkowe "zawsze private na stale" sprzed tej zmiany -
+        tamto bylo niezamierzonym domyslnym zachowaniem bez planu na
+        publikacje; to jest swiadoma brama recenzji. Zeby wrocic do
+        natychmiastowej publicznej publikacji, zmien privacyStatus na "public"
+        ponizej (albo przekaz privacy_status="public" do tej metody).
         """
         video_file = Path(video_path)
         if not video_file.exists():
@@ -104,7 +106,7 @@ class YouTubeClient:
 
         status: dict[str, Any] = {
             "selfDeclaredMadeForKids": False,
-            "privacyStatus": "public",
+            "privacyStatus": privacy_status,
         }
         if publish_at_iso_utc:
             status["publishAt"] = publish_at_iso_utc

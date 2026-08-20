@@ -2,7 +2,17 @@ name: Publish due social posts
 
 on:
   schedule:
-    # co 15 minut, dokladnie jak lokalne zadanie Harmonogramu Zadan Windows ktore to zastepuje
+    # Celowo NIE 3 sztywne wpisy cron w UTC dla 15:30/21:00/02:30 czasu
+    # polskiego (2026-08-20, user request) - GitHub Actions cron nie zna
+    # stref czasowych, wiec 3 sztywne godziny UTC przesuwalyby sie o godzine
+    # przy kazdej zmianie czasu w Polsce (koniec marca/pazdziernika) i
+    # wymagalyby recznej poprawki 2x/rok. Zamiast tego cron budzi sie co 15
+    # min przez cala dobe (repo jest publiczne -> darmowe, nieograniczone
+    # minuty Actions, wiec brak kosztu czestszego uruchamiania), a dokladne
+    # godziny 15:30/21:00/02:30 sa zapisane w schedule.csv jako czas lokalny
+    # Warszawy - main.py's is_due() poprawnie interpretuje je przez
+    # ZoneInfo("Europe/Warsaw"), ktore automatycznie i poprawnie obsluguje
+    # CEST/CET bez zadnej konserwacji.
     - cron: "*/15 * * * *"
   workflow_dispatch: {}
 

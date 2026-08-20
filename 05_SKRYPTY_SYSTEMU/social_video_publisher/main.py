@@ -147,6 +147,15 @@ def publish_row(row: ScheduleRow, settings, only: str | None) -> None:
         try:
             from instagram_client import InstagramClient
 
+            # UWAGA: Instagram Graph API nie ma prawdziwego trybu "Szkice" -
+            # w przeciwienstwie do YouTube (privacyStatus=private) i TikToka
+            # (Upload to Inbox), nie istnieje udokumentowany sposob wgrania
+            # Reelsa do recznej recenzji w aplikacji. Jedyna alternatywa
+            # (utworzyc kontener i NIE wolac media_publish) nie tworzy niczego
+            # widocznego/zarzadzalnego w apce - kontener po prostu wygasa po
+            # ~24h po cichu, wiec to gorsze niz publikacja na zywo, nie
+            # bezpieczniejsze. Do czasu realnej alternatywy Instagram publikuje
+            # od razu na zywo, tak jak wczesniej.
             client = InstagramClient(settings)
             caption = row.full_caption(row.hashtags_instagram)
             cover_path = str(_resolve_video_path(row.thumbnail_path)) if row.thumbnail_path else None
@@ -162,9 +171,11 @@ def publish_row(row: ScheduleRow, settings, only: str | None) -> None:
         try:
             from tiktok_client import TikTokClient
 
+            # Tryb "Szkice": wgrywa do Inbox TikToka zamiast publikowac na
+            # zywo (Direct Post) - trzeba recznie otworzyc appke i kliknac
+            # Post. Patrz TikTokClient.upload_to_inbox().
             client = TikTokClient(settings)
-            caption = row.full_caption(row.hashtags_tiktok)
-            res = client.publish_video(str(video_path), title=caption[:2200])
+            res = client.upload_to_inbox(str(video_path))
             results.append(f"tiktok:{res['status']}")
             had_success = True
         except Exception as exc:  # noqa: BLE001
