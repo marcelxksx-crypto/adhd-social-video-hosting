@@ -2,18 +2,27 @@ name: Publish due social posts
 
 on:
   schedule:
-    # Celowo NIE 3 sztywne wpisy cron w UTC dla 15:30/21:00/02:30 czasu
+    # Celowo NIE sztywne wpisy cron w UTC dla 15:30/21:00/02:30 czasu
     # polskiego (2026-08-20, user request) - GitHub Actions cron nie zna
-    # stref czasowych, wiec 3 sztywne godziny UTC przesuwalyby sie o godzine
+    # stref czasowych, wiec sztywne godziny UTC przesuwalyby sie o godzine
     # przy kazdej zmianie czasu w Polsce (koniec marca/pazdziernika) i
-    # wymagalyby recznej poprawki 2x/rok. Zamiast tego cron budzi sie co 15
+    # wymagalyby recznej poprawki 2x/rok. Zamiast tego cron budzi sie co 5
     # min przez cala dobe (repo jest publiczne -> darmowe, nieograniczone
-    # minuty Actions, wiec brak kosztu czestszego uruchamiania), a dokladne
-    # godziny 15:30/21:00/02:30 sa zapisane w schedule.csv jako czas lokalny
-    # Warszawy - main.py's is_due() poprawnie interpretuje je przez
-    # ZoneInfo("Europe/Warsaw"), ktore automatycznie i poprawnie obsluguje
-    # CEST/CET bez zadnej konserwacji.
-    - cron: "*/15 * * * *"
+    # minuty Actions, wiec brak kosztu czestszego uruchamiania - i tak
+    # ponizej 5 min GitHub Actions nie pozwala zejsc, "*/5" to najwyzsza
+    # dostepna czestotliwosc), a dokladne godziny 15:30/21:00/02:30 sa
+    # zapisane w schedule.csv jako czas lokalny Warszawy - main.py's
+    # is_due() poprawnie interpretuje je przez ZoneInfo("Europe/Warsaw"),
+    # ktore automatycznie i poprawnie obsluguje CEST/CET bez zadnej
+    # konserwacji. 2026-08-20: podbite z */15 na */5, bo GitHub's wlasny
+    # "schedule" trigger jest best-effort i potrafi pominac/opoznic
+    # uruchomienia w godzinach duzego obciazenia (udokumentowane przez
+    # GitHub, nie blad tego workflow) - zaobserwowane na zywo: 17:49-19:10
+    # bez ani jednego zaplanowanego uruchomienia mimo */15. Czestszy cron
+    # nie eliminuje tego zjawiska (to ograniczenie po stronie GitHuba), ale
+    # skraca typowe opoznienie i daje wiecej szans na zlapanie slotu blisko
+    # czasu docelowego.
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
