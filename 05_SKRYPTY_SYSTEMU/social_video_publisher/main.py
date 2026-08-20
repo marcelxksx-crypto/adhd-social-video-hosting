@@ -173,9 +173,12 @@ def publish_row(row: ScheduleRow, settings, only: str | None) -> None:
 
             # Tryb "Szkice": wgrywa do Inbox TikToka zamiast publikowac na
             # zywo (Direct Post) - trzeba recznie otworzyc appke i kliknac
-            # Post. Patrz TikTokClient.upload_to_inbox().
+            # Post. Patrz TikTokClient.upload_to_inbox(). Prawdziwy caption
+            # (nie pusty string) - bez niego TikTok podstawial jakas stara
+            # zapamietana wartosc zamiast zostawic pole puste.
             client = TikTokClient(settings)
-            res = client.upload_to_inbox(str(video_path))
+            caption = row.full_caption(row.hashtags_tiktok)
+            res = client.upload_to_inbox(str(video_path), title=caption[:2200])
             results.append(f"tiktok:{res['status']}")
             had_success = True
         except Exception as exc:  # noqa: BLE001

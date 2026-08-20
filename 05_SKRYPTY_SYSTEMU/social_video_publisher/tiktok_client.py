@@ -196,14 +196,19 @@ class TikTokClient:
         status = self._poll_until_done(publish_id)
         return {"publish_id": publish_id, "status": status}
 
-    def upload_to_inbox(self, video_path: str) -> dict[str, Any]:
+    def upload_to_inbox(self, video_path: str, title: str = "") -> dict[str, Any]:
         """Tryb 'Szkice': wysyla wideo do skrzynki odbiorczej aplikacji TikTok
-        zamiast publikowac na zywo - trzeba recznie otworzyc appke, dodac
-        opis/hashtagi i kliknac Post (albo odrzucic). Brak post_info/tytulu w
-        tym wywolaniu, bo nic nie idzie na zywo automatycznie - to sam kreator
-        uzupelnia w aplikacji. Wymaga scope video.upload (moze byc oddzielny
-        od video.publish uzywanego przez Direct Post - jesli 403/scope-error,
-        sprawdz uprawnienia appki w TikTok Developer Portal)."""
+        zamiast publikowac na zywo - trzeba recznie otworzyc appke, sprawdzic
+        opis/hashtagi i kliknac Post (albo odrzucic).
+
+        BUG naprawiony 2026-08-21: pierwotna wersja w ogole nie wysylala
+        post_info/title, zakladajac ze skoro nic nie idzie na zywo, TikTok
+        zostawi pole opisu puste do recznego wypelnienia. W praktyce
+        realne publikacje wychodzily z jakims stara/zapamietana wartoscia
+        ("Test chunk fix v2...") zamiast prawdziwego opisu z schedule.csv -
+        TikTok wyraznie cos wstawia w brakujace pole zamiast zostawiac je
+        puste. Naprawka: zawsze wysylac prawdziwy title (caption+hashtagi),
+        tak samo jak Direct Post juz robil."""
         self._refresh_access_token()
 
         video_file = Path(video_path)
@@ -212,16 +217,20 @@ class TikTokClient:
         video_size = video_file.stat().st_size
         chunk_size, total_chunks = self._chunk_plan(video_size)
 
+        payload: dict[str, Any] = {
+            "source_info": {
+                "source": "FILE_UPLOAD",
+                "video_size": video_size,
+                "chunk_size": chunk_size,
+                "total_chunk_count": total_chunks,
+            },
+        }
+        if title:
+            payload["post_info"] = {"title": title}
+
         init_resp = self._session.post(
             INBOX_INIT_URL,
-            json={
-                "source_info": {
-                    "source": "FILE_UPLOAD",
-                    "video_size": video_size,
-                    "chunk_size": chunk_size,
-                    "total_chunk_count": total_chunks,
-                },
-            },
+            json=payload,
             headers={
                 "Authorization": f"Bearer {self._access_token}",
                 "Content-Type": "application/json; charset=UTF-8",
