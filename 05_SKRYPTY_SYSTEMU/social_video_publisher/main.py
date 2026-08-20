@@ -134,7 +134,7 @@ def publish_row(row: ScheduleRow, settings, only: str | None) -> None:
             description = f"{row.caption}\n\n\U0001F449 Shop this printable: {YOUTUBE_UTM_LINK}"
             res = client.upload_short(
                 str(video_path), title=row.title, description=description, tags=tags,
-                thumbnail_path=thumb_path,
+                thumbnail_path=thumb_path, privacy_status="public",
             )
             results.append(f"youtube:{res['url']}")
             had_success = True
@@ -171,14 +171,14 @@ def publish_row(row: ScheduleRow, settings, only: str | None) -> None:
         try:
             from tiktok_client import TikTokClient
 
-            # Tryb "Szkice": wgrywa do Inbox TikToka zamiast publikowac na
-            # zywo (Direct Post) - trzeba recznie otworzyc appke i kliknac
-            # Post. Patrz TikTokClient.upload_to_inbox(). Prawdziwy caption
-            # (nie pusty string) - bez niego TikTok podstawial jakas stara
-            # zapamietana wartosc zamiast zostawic pole puste.
+            # 2026-08-20 (user request): z powrotem Direct Post, publikacja
+            # od razu na zywo zamiast Inbox/Szkice - patrz TikTokClient.
+            # publish_video(). Nadal wymuszone SELF_ONLY przez sam TikTok
+            # dopoki appka nie przejdzie ich audytu (ograniczenie platformy,
+            # nie tego skryptu).
             client = TikTokClient(settings)
             caption = row.full_caption(row.hashtags_tiktok)
-            res = client.upload_to_inbox(str(video_path), title=caption[:2200])
+            res = client.publish_video(str(video_path), title=caption[:2200])
             results.append(f"tiktok:{res['status']}")
             had_success = True
         except Exception as exc:  # noqa: BLE001
